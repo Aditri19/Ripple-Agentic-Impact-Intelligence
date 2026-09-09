@@ -1,0 +1,6 @@
+{
+  "name": "Ripple: Agentic Impact Intelligence",
+  "description": "Multi-stage cascading failure prediction and adversarial falsification engine for cloud infrastructure and SRE.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
