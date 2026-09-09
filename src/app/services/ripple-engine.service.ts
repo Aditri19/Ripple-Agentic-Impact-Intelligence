@@ -1,17 +1,26 @@
 import { Injectable, signal, computed, effect, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { PRESET_SCENARIOS } from '../data/scenarios.data';
-import { IncidentScenario, AgentStep, TopologyNode, TopologyEdge } from '../models/ripple.types';
+import { IncidentScenario, AgentStep, TopologyNode, TopologyEdge, FalsifierVerdict } from '../models/ripple.types';
+import { FalsifierToolService } from './falsifier-tool.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class RippleEngineService {
   private http = inject(HttpClient);
+  private falsifierService = inject(FalsifierToolService);
 
   // Scenarios State
   readonly scenarios = signal<IncidentScenario[]>(PRESET_SCENARIOS);
   readonly selectedScenarioId = signal<string>(PRESET_SCENARIOS[0].id);
+
+  // Edge Overrides (populated when Falsifier runs scans or manual overrides)
+  readonly edgeOverrides = signal<Record<string, Partial<TopologyEdge>>>({});
+
+  // Real-time Notice banner when a live incident is synthesized
+  readonly liveSynthesizedNotice = signal<string | null>(null);
 
   // Active Scenario
   readonly activeScenario = computed<IncidentScenario>(() => {
@@ -26,6 +35,12 @@ export class RippleEngineService {
   readonly playbackSpeed = signal<number>(1); // 1x, 2x, 4x
   readonly isLiveAnalyzing = signal<boolean>(false);
   readonly liveAnalysisError = signal<string | null>(null);
+  readonly justReset = signal<boolean>(false);
+  readonly isAutoplayComplete = signal<boolean>(false);
+  readonly isSimulatingDeliberation = signal<boolean>(false);
+  readonly deliberationProgress = signal<number>(0);
+  readonly deliberationStage = signal<string>('');
+  private resetNoticeTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Selected interactive elements for inspection drawer
   readonly selectedNodeId = signal<string | null>(null);
@@ -34,12 +49,13 @@ export class RippleEngineService {
   private timerHandle: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
-    // When scenario changes, reset step to 1 and pause
+    // When scenario changes, reset step to 1, pause, and mark reports uncompleted until autoplay runs
     effect(() => {
       const current = this.activeScenario();
       if (current) {
         this.currentStepIndex.set(1);
         this.stopAutoPlay();
+        this.isAutoplayComplete.set(false);
         // Select root anomaly node by default
         const rootNode = current.nodes.find((n) => n.health === 'ROOT_ANOMALY');
         this.selectedNodeId.set(rootNode ? rootNode.id : current.nodes[0]?.id || null);
@@ -64,8 +80,12 @@ export class RippleEngineService {
           const currentIdx = this.currentStepIndex();
           if (currentIdx < scenario.steps.length) {
             this.nextStep();
+            if (this.currentStepIndex() >= scenario.steps.length) {
+              this.isAutoplayComplete.set(true);
+            }
           } else {
             this.stopAutoPlay();
+            this.isAutoplayComplete.set(true);
           }
         }, intervalMs);
       }
@@ -128,8 +148,17 @@ export class RippleEngineService {
     const scenario = this.activeScenario();
     if (!scenario) return [];
     const currentStep = this.currentStepIndex();
+    const overrides = this.edgeOverrides();
 
     return scenario.edges.map((edge) => {
+      // If a manual or adversarial falsifier scan was executed on this edge, merge its live results
+      if (overrides[edge.id]) {
+        return {
+          ...edge,
+          ...overrides[edge.id],
+        };
+      }
+
       // Has this edge been evaluated yet?
       const isEvaluated = edge.activeInStep <= currentStep;
       if (!isEvaluated) {
@@ -172,6 +201,7 @@ export class RippleEngineService {
   // Actions
   selectScenario(id: string) {
     this.selectedScenarioId.set(id);
+    this.reset();
   }
 
   nextStep() {
@@ -186,6 +216,9 @@ export class RippleEngineService {
       if (step?.targetEdgeId) {
         this.selectedEdgeId.set(step.targetEdgeId);
       }
+      if (this.currentStepIndex() >= max) {
+        this.isAutoplayComplete.set(true);
+      }
     }
   }
 
@@ -199,6 +232,9 @@ export class RippleEngineService {
     const max = this.totalSteps();
     if (index >= 1 && index <= max) {
       this.currentStepIndex.set(index);
+      if (index >= max) {
+        this.isAutoplayComplete.set(true);
+      }
     }
   }
 
@@ -217,10 +253,91 @@ export class RippleEngineService {
   reset() {
     this.stopAutoPlay();
     this.currentStepIndex.set(1);
+    this.isAutoplayComplete.set(false);
+    this.isSimulatingDeliberation.set(false);
+    this.deliberationProgress.set(0);
+    this.deliberationStage.set('');
+    this.edgeOverrides.set({});
+    this.liveSynthesizedNotice.set(null);
+    this.falsifierService.reset();
     const scenario = this.activeScenario();
     const rootNode = scenario.nodes.find((n) => n.health === 'ROOT_ANOMALY');
     this.selectedNodeId.set(rootNode ? rootNode.id : scenario.nodes[0]?.id || null);
     this.selectedEdgeId.set(null);
+    this.liveAnalysisError.set(null);
+
+    // Trigger visual confirmation badge
+    this.justReset.set(true);
+    if (this.resetNoticeTimer) {
+      clearTimeout(this.resetNoticeTimer);
+    }
+    this.resetNoticeTimer = setTimeout(() => {
+      this.justReset.set(false);
+      this.resetNoticeTimer = null;
+    }, 3500);
+  }
+
+  updateEdgeFalsifierOutcome(
+    edgeId: string,
+    verdict: FalsifierVerdict,
+    calibratedProbability: number,
+    evidenceFound: string,
+    reason: string
+  ) {
+    this.edgeOverrides.update((curr) => ({
+      ...curr,
+      [edgeId]: {
+        falsifierVerdict: verdict,
+        calibratedProbability,
+        falsifierEvidenceFound: evidenceFound,
+        falsifierReason: reason,
+      },
+    }));
+  }
+
+  startWithAutoplay() {
+    this.reset();
+    setTimeout(() => {
+      this.isAutoPlaying.set(true);
+    }, 150);
+  }
+
+  startAutoplayAndNavigate() {
+    this.startWithAutoplay();
+    window.dispatchEvent(new CustomEvent('navigate-to-page', { detail: 'simulator' }));
+  }
+
+  async runFastDeliberationCycle(): Promise<void> {
+    this.stopAutoPlay();
+    this.isAutoplayComplete.set(false);
+    this.isSimulatingDeliberation.set(true);
+    this.currentStepIndex.set(1);
+
+    const stages = [
+      'Stage 1/5: Ingesting raw alert telemetry & identifying root anomaly boundary...',
+      'Stage 2/5: Mapping directional dependency topology & tracing cascade paths...',
+      'Stage 3/5: Interrogating live observability tools (GitOps, circuit-breakers, cache)...',
+      'Stage 4/5: Computing Empirical Bayes probabilities & Wilson 95% confidence intervals...',
+      'Stage 5/5: Synthesizing actionable SRE runbooks & empirical post-mortem benchmarks...',
+    ];
+
+    const max = this.totalSteps();
+    for (let i = 1; i <= max; i++) {
+      this.currentStepIndex.set(i);
+      this.deliberationProgress.set((i / max) * 100);
+      this.deliberationStage.set(stages[i - 1] || `Executing Deliberation Stage ${i}...`);
+      await new Promise((r) => setTimeout(r, 480));
+    }
+
+    this.isSimulatingDeliberation.set(false);
+    this.isAutoplayComplete.set(true);
+    this.deliberationStage.set('Deliberation completed. All incident reports synthesized.');
+  }
+
+  completeAutoplayImmediately() {
+    this.stopAutoPlay();
+    this.currentStepIndex.set(this.totalSteps());
+    this.isAutoplayComplete.set(true);
   }
 
   selectNode(nodeId: string) {
@@ -234,27 +351,31 @@ export class RippleEngineService {
   }
 
   // Live Incident Analysis
-  analyzeCustomIncident(incidentDescription: string, cluster = 'prod-us-west2-k8s-cluster-01') {
+  async analyzeCustomIncident(incidentDescription: string, cluster = 'prod-us-west2-k8s-cluster-01'): Promise<IncidentScenario> {
     this.isLiveAnalyzing.set(true);
     this.liveAnalysisError.set(null);
     this.stopAutoPlay();
 
-    this.http.post<IncidentScenario>('/api/analyze-incident', { incidentDescription, cluster }).subscribe({
-      next: (customScenario) => {
-        // Add or replace custom scenario in list
-        this.scenarios.update((list) => {
-          const filtered = list.filter((s) => s.id !== customScenario.id && !s.id.startsWith('live-incident-'));
-          return [...filtered, customScenario];
-        });
-        this.selectedScenarioId.set(customScenario.id);
-        this.currentStepIndex.set(1);
-        this.isLiveAnalyzing.set(false);
-      },
-      error: (err) => {
-        console.error('Failed live incident analysis:', err);
-        this.liveAnalysisError.set('Failed to analyze live incident. Reverted to baseline.');
-        this.isLiveAnalyzing.set(false);
-      },
-    });
+    try {
+      const customScenario = await firstValueFrom(
+        this.http.post<IncidentScenario>('/api/analyze-incident', { incidentDescription, cluster })
+      );
+      // Add or replace custom scenario in list
+      this.scenarios.update((list) => {
+        const filtered = list.filter((s) => s.id !== customScenario.id && !s.id.startsWith('live-incident-'));
+        return [...filtered, customScenario];
+      });
+      this.selectedScenarioId.set(customScenario.id);
+      this.currentStepIndex.set(1);
+      this.edgeOverrides.set({});
+      this.liveSynthesizedNotice.set(`Live Incident Synthesized: "${customScenario.title}" is active in the dependency graph.`);
+      return customScenario;
+    } catch (err: unknown) {
+      console.error('Failed live incident analysis:', err);
+      this.liveAnalysisError.set('Failed to analyze live incident. Reverted to baseline.');
+      throw err;
+    } finally {
+      this.isLiveAnalyzing.set(false);
+    }
   }
 }

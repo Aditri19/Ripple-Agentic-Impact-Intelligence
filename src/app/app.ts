@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, HostListener } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { RippleEngineService } from './services/ripple-engine.service';
 import { HeaderComponent } from './components/header.component';
+import { HomeOverviewComponent, AppPage } from './components/home-overview.component';
 import { PlaybackBarComponent } from './components/playback-bar.component';
 import { TopologyGraphComponent } from './components/topology-graph.component';
 import { AgentDeliberationFeedComponent } from './components/agent-deliberation-feed.component';
@@ -12,14 +14,16 @@ import { BacktestPanelComponent } from './components/backtest-panel.component';
 import { MitigationPanelComponent } from './components/mitigation-panel.component';
 import { CustomIncidentModalComponent } from './components/custom-incident-modal.component';
 
-export type ActiveTab = 'DELIBERATION' | 'FALSIFIER' | 'SCORING' | 'INSPECTOR' | 'BACKTEST' | 'MITIGATIONS';
+export type SimulatorSidebarTab = 'DELIBERATION' | 'INSPECTOR';
 
 @Component({
   selector: 'app-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    CommonModule,
     MatIconModule,
     HeaderComponent,
+    HomeOverviewComponent,
     PlaybackBarComponent,
     TopologyGraphComponent,
     AgentDeliberationFeedComponent,
@@ -35,9 +39,22 @@ export type ActiveTab = 'DELIBERATION' | 'FALSIFIER' | 'SCORING' | 'INSPECTOR' |
 })
 export class App {
   readonly engine = inject(RippleEngineService);
-  readonly activeTab = signal<ActiveTab>('FALSIFIER');
+  readonly currentPage = signal<AppPage>('home');
+  readonly simulatorTab = signal<SimulatorSidebarTab>('DELIBERATION');
 
-  setTab(tab: ActiveTab) {
-    this.activeTab.set(tab);
+  @HostListener('window:navigate-to-page', ['$event'])
+  onNavigateToPage(event: Event) {
+    const customEvent = event as CustomEvent<AppPage>;
+    if (customEvent && customEvent.detail) {
+      this.currentPage.set(customEvent.detail);
+    }
+  }
+
+  setPage(page: AppPage) {
+    this.currentPage.set(page);
+  }
+
+  setSimulatorTab(tab: SimulatorSidebarTab) {
+    this.simulatorTab.set(tab);
   }
 }

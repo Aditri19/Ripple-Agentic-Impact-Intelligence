@@ -373,4 +373,10 @@ export class FalsifierToolService {
       evidenceFound: 'Direct unbuffered gRPC calls, thread pool 98% blocked, p99 latency spiked 4.8x (620ms). Immediate SRE intervention required.',
     };
   }
+
+  reset() {
+    this.isRunningSuite.set(false);
+    this.currentInvestigation.set(null);
+    this.executionLog.set([]);
+  }
 }

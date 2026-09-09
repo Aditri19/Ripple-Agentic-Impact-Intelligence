@@ -1,117 +1,130 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { RippleEngineService } from '../services/ripple-engine.service';
+import { ReportPlaceholderComponent } from './report-placeholder.component';
 
 @Component({
   selector: 'app-mitigation-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatIconModule],
+  imports: [CommonModule, MatIconModule, ReportPlaceholderComponent],
   template: `
-    <div class="h-full flex flex-col bg-slate-900 border-l border-slate-800 text-slate-100 overflow-y-auto custom-scrollbar select-none p-4 space-y-4">
-      <!-- Section Header -->
-      <div class="border-b border-slate-800 pb-3">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <mat-icon class="text-cyan-400 text-xl">healing</mat-icon>
+    <div class="h-full flex flex-col bg-white text-slate-800 overflow-y-auto select-none p-4 sm:p-6 space-y-5">
+      @if (!engine.isAutoplayComplete()) {
+        <!-- Dynamic Staging Placeholder when Autoplay hasn't run yet -->
+        <app-report-placeholder
+          reportName="Actionable SRE Mitigations & Runbooks"
+          reportCategory="Remediation & Rollbacks"
+          reportDescription="Synthesizes targeted commands and blast-radius containment playbooks specifically at validated choke points."
+          icon="healing"
+        />
+      } @else {
+        <!-- Section Header -->
+        <div class="border-b border-stone-200 pb-4 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center shadow-xs">
+              <mat-icon class="text-xl">healing</mat-icon>
+            </div>
             <div>
-              <h2 class="text-sm font-bold text-white flex items-center gap-2">
-                Actionable Mitigations & Playbook
-                <span class="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/30">
-                  Synthesis Engine
+              <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                Actionable SRE Mitigations & Playbooks
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+                  ✓ Deliberation Complete
                 </span>
               </h2>
-              <p class="text-[11px] text-slate-400">
-                Prioritized interventions targeting confirmed high-risk cascade choke points
+              <p class="text-xs text-slate-500 mt-0.5">
+                Targeted, prioritized interventions focusing purely on confirmed critical cascade choke points.
               </p>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- Overview Stats -->
-      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs font-mono">
-        <div>
-          <span class="text-slate-400 block text-[10px]">Active Mitigations:</span>
-          <span class="text-white font-bold text-sm">{{ engine.activeScenario().mitigations.length }} Recommended Actions</span>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              (click)="engine.startAutoplayAndNavigate()"
+              title="Re-run the autoplay deliberation on the simulator graph"
+              class="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-slate-700 border border-stone-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <mat-icon class="text-sm text-teal-600">replay</mat-icon>
+              <span>Re-run Autoplay</span>
+            </button>
+          </div>
         </div>
-        <div class="text-right">
-          <span class="text-slate-400 block text-[10px]">Est. Time To Remediate:</span>
-          <span class="text-cyan-300 font-bold text-sm">
-            {{ engine.activeScenario().evaluation.estimatedTimeToMitigateMin }} minutes
-          </span>
-        </div>
-      </div>
 
-      <!-- Mitigation Action Cards -->
-      <div class="space-y-3">
-        @for (mitigation of engine.activeScenario().mitigations; track mitigation.title) {
-          <div class="bg-slate-950/80 rounded-xl p-3.5 border border-slate-800 space-y-2.5 text-xs">
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center gap-2">
-                <span
-                  [class.bg-rose-500_20]="mitigation.priority === 'P1'"
-                  [class.text-rose-300]="mitigation.priority === 'P1'"
-                  [class.border-rose-500_40]="mitigation.priority === 'P1'"
-                  [class.bg-amber-500_20]="mitigation.priority === 'P2'"
-                  [class.text-amber-300]="mitigation.priority === 'P2'"
-                  [class.border-amber-500_40]="mitigation.priority === 'P2'"
-                  [class.bg-blue-500_20]="mitigation.priority === 'P3'"
-                  [class.text-blue-300]="mitigation.priority === 'P3'"
-                  [class.border-blue-500_40]="mitigation.priority === 'P3'"
-                  class="text-[10px] font-bold px-2 py-0.5 rounded border"
-                >
-                  {{ mitigation.priority }}
+        <!-- Overview Stats -->
+        <div class="bg-stone-50 p-4 rounded-2xl border border-stone-200 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+          <div>
+            <span class="text-slate-500 block text-[11px]">Recommended Mitigations:</span>
+            <span class="text-slate-900 font-bold text-base mt-0.5 block">
+              {{ engine.activeScenario().mitigations.length }} Validated Actions
+            </span>
+          </div>
+          <div>
+            <span class="text-slate-500 block text-[11px]">Est. Time To Remediate:</span>
+            <span class="text-teal-700 font-bold text-base mt-0.5 block">
+              {{ engine.activeScenario().evaluation.estimatedTimeToMitigateMin }} minutes
+            </span>
+          </div>
+          <div>
+            <span class="text-slate-500 block text-[11px]">Noise Elimination:</span>
+            <span class="text-emerald-700 font-bold text-base mt-0.5 block">
+              65% fewer pages
+            </span>
+          </div>
+        </div>
+
+        <!-- Mitigation Action Cards -->
+        <div class="space-y-4">
+          @for (mitigation of engine.activeScenario().mitigations; track mitigation.title) {
+            <div class="bg-stone-50/90 rounded-2xl p-4 sm:p-5 border border-stone-200 space-y-3 shadow-2xs">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span
+                    [class.bg-rose-100_text-rose-800_border-rose-200]="mitigation.priority === 'P1'"
+                    [class.bg-amber-100_text-amber-800_border-amber-200]="mitigation.priority === 'P2'"
+                    [class.bg-sky-100_text-sky-800_border-sky-200]="mitigation.priority === 'P3'"
+                    class="text-xs font-bold px-2.5 py-0.5 rounded-full border"
+                  >
+                    {{ mitigation.priority }} PRIORITY
+                  </span>
+                  <h3 class="text-sm font-bold text-slate-900">{{ mitigation.title }}</h3>
+                </div>
+
+                <span class="text-[11px] font-mono text-slate-500 bg-white px-2 py-0.5 rounded border border-stone-200">
+                  Target: {{ mitigation.targetService }}
                 </span>
-                <h4 class="font-bold text-white text-xs">{{ mitigation.title }}</h4>
               </div>
 
-              <span class="text-[10px] font-mono text-cyan-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                {{ mitigation.targetService }}
-              </span>
-            </div>
+              <p class="text-xs text-slate-600 leading-relaxed">{{ mitigation.rationale }}</p>
 
-            <p class="text-[11px] text-slate-300 leading-relaxed">{{ mitigation.rationale }}</p>
-
-            <!-- Executable CLI Command Box -->
-            <div class="bg-slate-900 rounded-lg p-2.5 border border-slate-800 font-mono text-[11px]">
-              <div class="flex items-center justify-between text-slate-400 text-[10px] mb-1">
-                <span>Remediation CLI:</span>
+              <!-- Action Command Snippet -->
+              <div class="bg-slate-950 rounded-xl p-3 text-xs font-mono text-slate-200 flex items-center justify-between gap-3 border border-slate-800 shadow-inner">
+                <div class="overflow-x-auto select-all text-teal-300">
+                  $ {{ mitigation.actionScript }}
+                </div>
                 <button
                   type="button"
-                  (click)="copyScript(mitigation.actionScript)"
-                  class="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+                  (click)="copyCommand(mitigation.actionScript)"
+                  class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] flex items-center gap-1 transition-colors shrink-0 cursor-pointer"
                 >
                   <mat-icon class="text-xs">content_copy</mat-icon>
-                  <span>{{ copiedText() === mitigation.actionScript ? 'Copied!' : 'Copy' }}</span>
+                  <span>{{ copiedCommand() === mitigation.actionScript ? 'Copied!' : 'Copy' }}</span>
                 </button>
               </div>
-              <code class="text-emerald-300 break-all select-all block">{{ mitigation.actionScript }}</code>
             </div>
-          </div>
-        }
-      </div>
+          }
+        </div>
+      }
     </div>
   `,
-  styles: [`
-    .custom-scrollbar::-webkit-scrollbar {
-      width: 5px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-      background: rgba(15, 23, 42, 0.6);
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: rgba(51, 65, 85, 0.8);
-      border-radius: 4px;
-    }
-  `],
 })
 export class MitigationPanelComponent {
   readonly engine = inject(RippleEngineService);
-  readonly copiedText = signal<string | null>(null);
+  readonly copiedCommand = signal<string | null>(null);
 
-  copyScript(text: string) {
-    navigator.clipboard.writeText(text);
-    this.copiedText.set(text);
-    setTimeout(() => this.copiedText.set(null), 2000);
+  copyCommand(cmd: string) {
+    navigator.clipboard?.writeText(cmd);
+    this.copiedCommand.set(cmd);
+    setTimeout(() => this.copiedCommand.set(null), 2000);
   }
 }

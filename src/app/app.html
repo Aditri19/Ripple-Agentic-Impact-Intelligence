@@ -1,204 +1,264 @@
-<div class="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-cyan-500 selection:text-white">
-  <!-- Top Global Header -->
-  <app-header />
+<div class="min-h-screen bg-[#f8faf9] text-slate-800 flex flex-col font-sans antialiased selection:bg-teal-500 selection:text-white">
+  <!-- Top Navigation Header -->
+  <app-header [currentPage]="currentPage()" (pageChange)="setPage($event)" />
 
-  <!-- Playback and Stepping Control Bar -->
-  <app-playback-bar />
-
-  <!-- Main Multi-Column Split Workspace -->
-  <main class="flex-1 flex flex-col lg:flex-row overflow-hidden">
-    <!-- Left Workspace: Topology Canvas & Incident Quantification (60% Desktop) -->
-    <section class="flex-1 flex flex-col p-4 lg:p-6 overflow-y-auto space-y-4 max-w-full">
-      <!-- 1. Event Agent Incident Quantification Card -->
-      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 text-xs select-none shadow-sm">
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
-          <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center">
-              <mat-icon class="text-lg animate-pulse">warning</mat-icon>
-            </div>
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30">
-                  EVENT AGENT (MCP INGESTION)
-                </span>
-                <span class="text-slate-400 font-mono text-[11px]">{{ engine.activeScenario().triggerEvent.timestamp }}</span>
-              </div>
-              <h2 class="text-sm font-bold text-white mt-0.5">
-                {{ engine.activeScenario().title }}
-              </h2>
-            </div>
-          </div>
-
-          <!-- Quantitative Percentile Badge -->
-          <div class="flex items-center gap-2 font-mono">
-            <span class="bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-300 text-[11px]">
-              Historical Anomaly: <strong class="text-rose-400">{{ engine.activeScenario().triggerEvent.historicalPercentile }}th %ile</strong>
-            </span>
-          </div>
+  <!-- Global Reset Confirmation Toast Alert when reset button is pressed in any view -->
+  @if (engine.justReset() && currentPage() !== 'home') {
+    <div class="bg-emerald-50 border-b border-emerald-200 text-emerald-800 px-4 py-2 text-xs flex items-center justify-between select-none shadow-2xs">
+      <div class="flex items-center gap-2 max-w-7xl mx-auto w-full justify-between">
+        <div class="flex items-center gap-2">
+          <mat-icon class="text-base text-emerald-600">check_circle</mat-icon>
+          <span class="font-bold">Environment Reset:</span>
+          <span>All simulation steps, falsifier counter-evidence probes, and overrides have been cleared. Ready to begin again!</span>
         </div>
-
-        <!-- Metric Deviations & Root Candidate -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 pt-1">
-          <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80">
-            <span class="text-[10px] text-slate-400 font-mono block">Measured Magnitude:</span>
-            <span class="text-xs font-bold text-amber-300 block mt-0.5">
-              {{ engine.activeScenario().triggerEvent.magnitude }}
-            </span>
-          </div>
-
-          <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80">
-            <span class="text-[10px] text-slate-400 font-mono block">Primary SRE On-Call:</span>
-            <span class="text-xs font-semibold text-slate-200 block mt-0.5 truncate">
-              {{ engine.activeScenario().triggerEvent.sreOwner }}
-            </span>
-          </div>
-
-          <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80">
-            <span class="text-[10px] text-slate-400 font-mono block">Candidate Root Cause:</span>
-            <span class="text-xs font-semibold text-slate-300 block mt-0.5 truncate" [title]="engine.activeScenario().triggerEvent.rootCauseCandidate">
-              {{ engine.activeScenario().triggerEvent.rootCauseCandidate }}
-            </span>
-          </div>
-        </div>
+        <button
+          type="button"
+          (click)="setPage('simulator'); engine.startWithAutoplay()"
+          class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+        >
+          <mat-icon class="text-xs">play_arrow</mat-icon>
+          <span>Start Autoplay</span>
+        </button>
       </div>
+    </div>
+  }
 
-      <!-- 2. System Dependency Topology Graph -->
-      <app-topology-graph />
-
-      <!-- 3. Current Step Callout & Immediate Reasoning Summary -->
-      @if (engine.currentStep(); as step) {
-        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 text-xs select-none">
-          <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
-            <div class="flex items-center gap-2 font-mono">
-              <span class="text-cyan-400 font-bold">Stage: {{ step.stageName }}</span>
-              <span class="text-slate-500">•</span>
-              <span class="text-slate-300">{{ step.title }}</span>
-            </div>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-              Agent: {{ step.agent }}
-            </span>
-          </div>
-          <p class="text-slate-300 text-xs leading-relaxed">{{ step.summary }}</p>
+  <!-- Page Routing View Switcher -->
+  <main class="flex-1 flex flex-col overflow-hidden">
+    @switch (currentPage()) {
+      <!-- PAGE 1: Home Overview & All Features Showcase -->
+      @case ('home') {
+        <div class="flex-1 overflow-y-auto">
+          <app-home-overview (pageChange)="setPage($event)" />
         </div>
       }
-    </section>
 
-    <!-- Right Workspace: Multi-Agent Intelligence & Analysis Tabs (40% Desktop) -->
-    <section class="w-full lg:w-[480px] xl:w-[540px] flex flex-col bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 overflow-hidden">
-      <!-- Tab Header Navigation -->
-      <div class="bg-slate-950 px-3 pt-3 border-b border-slate-800 flex items-center gap-1 overflow-x-auto select-none">
-        <button
-          type="button"
-          (click)="setTab('FALSIFIER')"
-          [class.bg-slate-900]="activeTab() === 'FALSIFIER'"
-          [class.text-rose-400]="activeTab() === 'FALSIFIER'"
-          [class.border-t-2]="activeTab() === 'FALSIFIER'"
-          [class.border-rose-400]="activeTab() === 'FALSIFIER'"
-          [class.text-slate-400]="activeTab() !== 'FALSIFIER'"
-          class="px-3 py-2 rounded-t-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
-        >
-          <mat-icon class="text-base text-rose-400">security</mat-icon>
-          <span>Falsifier Tools</span>
-          <span class="text-[9px] px-1 py-0.2 rounded bg-rose-500/20 text-rose-300 font-bold">Centerpiece</span>
-        </button>
+      <!-- PAGE 2: Simulation & Autoplay Workspace -->
+      @case ('simulator') {
+        <div class="flex-1 flex flex-col overflow-hidden">
+          <!-- Playback and Stepping Control Bar -->
+          <app-playback-bar />
 
-        <button
-          type="button"
-          (click)="setTab('BACKTEST')"
-          [class.bg-slate-900]="activeTab() === 'BACKTEST'"
-          [class.text-cyan-400]="activeTab() === 'BACKTEST'"
-          [class.border-t-2]="activeTab() === 'BACKTEST'"
-          [class.border-cyan-400]="activeTab() === 'BACKTEST'"
-          [class.text-slate-400]="activeTab() !== 'BACKTEST'"
-          class="px-3 py-2 rounded-t-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
-        >
-          <mat-icon class="text-base text-emerald-400">fact_check</mat-icon>
-          <span>Backtest (N=8)</span>
-        </button>
+          <!-- Main Multi-Column Split Workspace -->
+          <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            <!-- Left Workspace: Topology Canvas & Incident Quantification (65% Desktop) -->
+            <section class="flex-1 flex flex-col p-4 lg:p-6 overflow-y-auto space-y-4 max-w-full">
+              <!-- Live Ingested Incident Banner -->
+              @if (engine.liveSynthesizedNotice(); as notice) {
+                <div class="bg-teal-50 border border-teal-200 text-teal-950 rounded-2xl p-3.5 flex items-center justify-between text-xs shadow-xs animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center shrink-0">
+                      <mat-icon class="text-lg">auto_awesome</mat-icon>
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-1.5 font-bold font-mono text-teal-900">
+                        <span>LIVE INCIDENT SYNTHESIS ACTIVE:</span>
+                      </div>
+                      <p class="text-teal-800 mt-0.5">{{ notice }}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    (click)="engine.liveSynthesizedNotice.set(null)"
+                    title="Dismiss notification"
+                    class="p-1 rounded-lg text-teal-700 hover:bg-teal-100 transition-colors cursor-pointer"
+                  >
+                    <mat-icon class="text-sm">close</mat-icon>
+                  </button>
+                </div>
+              }
 
-        <button
-          type="button"
-          (click)="setTab('DELIBERATION')"
-          [class.bg-slate-900]="activeTab() === 'DELIBERATION'"
-          [class.text-cyan-400]="activeTab() === 'DELIBERATION'"
-          [class.border-t-2]="activeTab() === 'DELIBERATION'"
-          [class.border-cyan-400]="activeTab() === 'DELIBERATION'"
-          [class.text-slate-400]="activeTab() !== 'DELIBERATION'"
-          class="px-3 py-2 rounded-t-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
-        >
-          <mat-icon class="text-base">psychology</mat-icon>
-          <span>Deliberation</span>
-        </button>
+              <!-- 1. Event Agent Incident Quantification Card -->
+              <div class="bg-white rounded-3xl border border-stone-200/90 p-4 text-xs select-none shadow-xs">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 pb-3">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center">
+                      <mat-icon class="text-lg animate-pulse">warning</mat-icon>
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-bold border border-rose-200">
+                          EVENT AGENT (MCP INGESTION)
+                        </span>
+                        <span class="text-slate-400 font-mono text-[11px]">{{ engine.activeScenario().triggerEvent.timestamp }}</span>
+                      </div>
+                      <h2 class="text-sm font-bold text-slate-900 mt-0.5">
+                        {{ engine.activeScenario().title }}
+                      </h2>
+                    </div>
+                  </div>
 
-        <button
-          type="button"
-          (click)="setTab('SCORING')"
-          [class.bg-slate-900]="activeTab() === 'SCORING'"
-          [class.text-cyan-400]="activeTab() === 'SCORING'"
-          [class.border-t-2]="activeTab() === 'SCORING'"
-          [class.border-cyan-400]="activeTab() === 'SCORING'"
-          [class.text-slate-400]="activeTab() !== 'SCORING'"
-          class="px-3 py-2 rounded-t-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
-        >
-          <mat-icon class="text-base">functions</mat-icon>
-          <span>Scoring</span>
-        </button>
+                  <!-- Quantitative Percentile Badge -->
+                  <div class="flex items-center gap-2 font-mono">
+                    <span class="bg-stone-50 px-3 py-1.5 rounded-xl border border-stone-200 text-slate-700 text-[11px]">
+                      Historical Anomaly: <strong class="text-rose-700">{{ engine.activeScenario().triggerEvent.historicalPercentile }}th %ile</strong>
+                    </span>
+                  </div>
+                </div>
 
-        <button
-          type="button"
-          (click)="setTab('INSPECTOR')"
-          [class.bg-slate-900]="activeTab() === 'INSPECTOR'"
-          [class.text-cyan-400]="activeTab() === 'INSPECTOR'"
-          [class.border-t-2]="activeTab() === 'INSPECTOR'"
-          [class.border-cyan-400]="activeTab() === 'INSPECTOR'"
-          [class.text-slate-400]="activeTab() !== 'INSPECTOR'"
-          class="px-3 py-2 rounded-t-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
-        >
-          <mat-icon class="text-base">search</mat-icon>
-          <span>Inspector</span>
-        </button>
+                <!-- Metric Deviations & Root Candidate -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 pt-1">
+                  <div class="bg-stone-50/80 p-2.5 rounded-xl border border-stone-200/60">
+                    <span class="text-[10px] text-slate-500 font-mono block">Measured Magnitude:</span>
+                    <span class="text-xs font-bold text-amber-800 block mt-0.5">
+                      {{ engine.activeScenario().triggerEvent.magnitude }}
+                    </span>
+                  </div>
 
-        <button
-          type="button"
-          (click)="setTab('MITIGATIONS')"
-          [class.bg-slate-900]="activeTab() === 'MITIGATIONS'"
-          [class.text-cyan-400]="activeTab() === 'MITIGATIONS'"
-          [class.border-t-2]="activeTab() === 'MITIGATIONS'"
-          [class.border-cyan-400]="activeTab() === 'MITIGATIONS'"
-          [class.text-slate-400]="activeTab() !== 'MITIGATIONS'"
-          class="px-3 py-2 rounded-t-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
-        >
-          <mat-icon class="text-base">healing</mat-icon>
-          <span>Mitigations</span>
-        </button>
-      </div>
+                  <div class="bg-stone-50/80 p-2.5 rounded-xl border border-stone-200/60">
+                    <span class="text-[10px] text-slate-500 font-mono block">Primary SRE On-Call:</span>
+                    <span class="text-xs font-semibold text-slate-800 block mt-0.5 truncate">
+                      {{ engine.activeScenario().triggerEvent.sreOwner }}
+                    </span>
+                  </div>
 
-      <!-- Tab Body Container -->
-      <div class="flex-1 overflow-hidden">
-        @switch (activeTab()) {
-          @case ('FALSIFIER') {
+                  <div class="bg-stone-50/80 p-2.5 rounded-xl border border-stone-200/60">
+                    <span class="text-[10px] text-slate-500 font-mono block">Candidate Root Cause:</span>
+                    <span class="text-xs font-semibold text-slate-700 block mt-0.5 truncate" [title]="engine.activeScenario().triggerEvent.rootCauseCandidate">
+                      {{ engine.activeScenario().triggerEvent.rootCauseCandidate }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. System Dependency Topology Graph -->
+              <app-topology-graph />
+
+              <!-- 3. Current Step Callout & Reasoning Summary -->
+              @if (engine.currentStep(); as step) {
+                <div class="bg-white rounded-3xl border border-stone-200/90 p-4 text-xs select-none shadow-xs space-y-2">
+                  <div class="flex items-center justify-between border-b border-stone-100 pb-2">
+                    <div class="flex items-center gap-2 font-mono">
+                      <span class="text-teal-800 font-bold">Stage {{ step.stepIndex }}: {{ step.stageName }}</span>
+                      <span class="text-slate-300">•</span>
+                      <span class="text-slate-700 font-sans font-semibold">{{ step.title }}</span>
+                    </div>
+                    <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-stone-100 text-slate-700 border border-stone-200 font-bold">
+                      Agent: {{ step.agent }}
+                    </span>
+                  </div>
+                  <p class="text-slate-600 text-xs leading-relaxed">{{ step.summary }}</p>
+
+                  <!-- Quick Panel Jump Links -->
+                  <div class="pt-2 border-t border-stone-100 flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[11px] text-slate-500 font-medium">Deep-dive into deliberate results:</span>
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        (click)="setPage('falsifier')"
+                        class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-800 font-semibold text-[11px] border border-rose-200 flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <mat-icon class="text-xs">security</mat-icon>
+                        <span>Falsifier Probe Results</span>
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setPage('mitigations')"
+                        class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold text-[11px] border border-amber-200 flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <mat-icon class="text-xs">healing</mat-icon>
+                        <span>SRE Mitigations</span>
+                      </button>
+                      <button
+                        type="button"
+                        (click)="setPage('backtest')"
+                        class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold text-[11px] border border-emerald-200 flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <mat-icon class="text-xs">fact_check</mat-icon>
+                        <span>Backtest (N=8)</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              }
+            </section>
+
+            <!-- Right Workspace: Multi-Agent Intelligence & Telemetry Sidebar (35% Desktop) -->
+            <section class="w-full lg:w-[440px] xl:w-[480px] flex flex-col bg-white border-t lg:border-t-0 lg:border-l border-stone-200 overflow-hidden">
+              <!-- Sidebar Navigation Toggle -->
+              <div class="bg-stone-50 px-3 pt-3 border-b border-stone-200 flex items-center gap-1.5 select-none">
+                <button
+                  type="button"
+                  (click)="setSimulatorTab('DELIBERATION')"
+                  [class.bg-white]="simulatorTab() === 'DELIBERATION'"
+                  [class.text-teal-800]="simulatorTab() === 'DELIBERATION'"
+                  [class.border-teal-400]="simulatorTab() === 'DELIBERATION'"
+                  [class.border-t-2]="simulatorTab() === 'DELIBERATION'"
+                  [class.font-bold]="simulatorTab() === 'DELIBERATION'"
+                  [class.text-slate-600]="simulatorTab() !== 'DELIBERATION'"
+                  class="px-4 py-2 rounded-t-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+                >
+                  <mat-icon class="text-base text-teal-600">psychology</mat-icon>
+                  <span>Deliberation Protocol</span>
+                </button>
+
+                <button
+                  type="button"
+                  (click)="setSimulatorTab('INSPECTOR')"
+                  [class.bg-white]="simulatorTab() === 'INSPECTOR'"
+                  [class.text-teal-800]="simulatorTab() === 'INSPECTOR'"
+                  [class.border-teal-400]="simulatorTab() === 'INSPECTOR'"
+                  [class.border-t-2]="simulatorTab() === 'INSPECTOR'"
+                  [class.font-bold]="simulatorTab() === 'INSPECTOR'"
+                  [class.text-slate-600]="simulatorTab() !== 'INSPECTOR'"
+                  class="px-4 py-2 rounded-t-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+                >
+                  <mat-icon class="text-base text-teal-600">troubleshoot</mat-icon>
+                  <span>Node Telemetry Inspector</span>
+                </button>
+              </div>
+
+              <!-- Sidebar Body -->
+              <div class="flex-1 overflow-hidden">
+                @if (simulatorTab() === 'DELIBERATION') {
+                  <app-agent-deliberation-feed />
+                } @else {
+                  <app-node-inspector />
+                }
+              </div>
+            </section>
+          </div>
+        </div>
+      }
+
+      <!-- PAGE 3: Adversarial Falsifier Workbench -->
+      @case ('falsifier') {
+        <div class="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 overflow-y-auto">
+          <div class="bg-white rounded-3xl border border-stone-200/90 shadow-sm overflow-hidden min-h-[640px]">
             <app-falsifier-workbench />
-          }
-          @case ('BACKTEST') {
+          </div>
+        </div>
+      }
+
+      <!-- PAGE 4: Empirical Backtest Benchmark (N=8) -->
+      @case ('backtest') {
+        <div class="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 overflow-y-auto">
+          <div class="bg-white rounded-3xl border border-stone-200/90 shadow-sm overflow-hidden min-h-[640px]">
             <app-backtest-panel />
-          }
-          @case ('DELIBERATION') {
-            <app-agent-deliberation-feed />
-          }
-          @case ('SCORING') {
-            <app-scoring-breakdown />
-          }
-          @case ('INSPECTOR') {
-            <app-node-inspector />
-          }
-          @case ('MITIGATIONS') {
+          </div>
+        </div>
+      }
+
+      <!-- PAGE 5: SRE Mitigations & Playbooks -->
+      @case ('mitigations') {
+        <div class="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 overflow-y-auto">
+          <div class="bg-white rounded-3xl border border-stone-200/90 shadow-sm overflow-hidden min-h-[640px]">
             <app-mitigation-panel />
-          }
-        }
-      </div>
-    </section>
+          </div>
+        </div>
+      }
+
+      <!-- PAGE 6: Calibrated Scoring Engine & Mathematics -->
+      @case ('scoring') {
+        <div class="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 overflow-y-auto">
+          <div class="bg-white rounded-3xl border border-stone-200/90 shadow-sm overflow-hidden min-h-[640px]">
+            <app-scoring-breakdown />
+          </div>
+        </div>
+      }
+    }
   </main>
 
-  <!-- Live Custom Incident Input Modal -->
+  <!-- Live Custom Incident Input Modal (Triggered globally) -->
   <app-custom-incident-modal />
 </div>
